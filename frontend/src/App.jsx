@@ -1,31 +1,51 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import FactCard from "./components/FactCard";
 import NextFactButton from "./components/NextFactButton";
 import StatusPill from "./components/StatusPill";
 
-const HARDCODED_FACT = {
-  id: "f-2a91-4b8c-9d3e-1a2b3c4d5e6f",
-  text: "Honey never spoils. Archaeologists have found 3,000-year-old jars of honey in Egyptian tombs that were still perfectly edible.",
-  source_url:
-    "https://www.smithsonianmag.com/science/the-science-behind-honeys-eternal-shelf-life",
-  fetched_at: new Date().toISOString(),
-};
+async function fetchFact() {
+  const res = await fetch("/api/facts/random");
+  if (res.status === 404) {
+    return { empty: true };
+  }
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+  return res.json();
+}
 
 export default function App() {
-  const [fact, setFact] = useState(HARDCODED_FACT);
-  const [loading, setLoading] = useState(false);
+  const [fact, setFact] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const handleNextFact = () => {
+  const loadFact = useCallback(async () => {
     setLoading(true);
-    // Simulate loading for now — Ticket 9 connects to real API
-    setTimeout(() => {
-      setFact({ ...HARDCODED_FACT, fetched_at: new Date().toISOString() });
+    setError(null);
+    try {
+      const data = await fetchFact();
+      if (data.empty) {
+        setFact(null);
+        setError("empty");
+      } else {
+        setFact(data);
+      }
+    } catch (e) {
+      setError(e.message);
+    } finally {
       setLoading(false);
-    }, 600);
-  };
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFact();
+  }, [loadFact]);
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ background: "var(--color-background)" }}>
+    <div
+      className="flex min-h-screen flex-col"
+      style={{ background: "var(--color-background)" }}
+    >
       {/* Accent bar */}
       <div
         className="h-[3px] w-full"
@@ -51,7 +71,11 @@ export default function App() {
           <div className="flex items-center gap-3">
             <div
               className="flex items-center justify-center rounded-xl"
-              style={{ width: 36, height: 36, background: "var(--color-primary)" }}
+              style={{
+                width: 36,
+                height: 36,
+                background: "var(--color-primary)",
+              }}
             >
               <span
                 style={{
@@ -151,14 +175,84 @@ export default function App() {
           >
             GET /api/facts/random
           </span>
-          <NextFactButton onClick={handleNextFact} loading={loading} />
+          <NextFactButton onClick={loadFact} loading={loading} />
         </div>
 
-        {fact && <FactCard fact={fact} />}
+        {/* Loading skeleton */}
+        {loading && !fact && (
+          <div
+            className="animate-pulse rounded-2xl border"
+            style={{
+              borderColor: "var(--color-border)",
+              background: "var(--color-surface)",
+              padding: "28px 32px",
+              height: 160,
+            }}
+          />
+        )}
+
+        {/* Error state */}
+        {error && error !== "empty" && (
+          <div
+            className="rounded-2xl border"
+            style={{
+              borderColor: "var(--color-border)",
+              background: "var(--color-surface)",
+              padding: "28px 32px",
+            }}
+          >
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: 15,
+                color: "var(--color-muted)",
+              }}
+            >
+              Could not reach the API. Make sure the backend is running.
+            </p>
+          </div>
+        )}
+
+        {/* Empty state — worker hasn't fetched yet */}
+        {error === "empty" && (
+          <div
+            className="rounded-2xl border"
+            style={{
+              borderColor: "var(--color-border)",
+              background: "var(--color-surface)",
+              padding: "28px 32px",
+            }}
+          >
+            <p
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 22,
+                marginBottom: 8,
+              }}
+            >
+              No facts yet
+            </p>
+            <p
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: 15,
+                color: "var(--color-muted)",
+              }}
+            >
+              The background worker is fetching facts — check back in a moment.
+            </p>
+          </div>
+        )}
+
+        {/* Fact card */}
+        {!loading && fact && <FactCard fact={fact} />}
       </main>
 
       {/* Footer */}
-      <footer className="border-t" style={{ borderColor: "var(--color-border)" }}>
+      <footer
+        className="border-t"
+        style={{ borderColor: "var(--color-border)" }}
+      >
         <div
           className="mx-auto flex flex-col items-center justify-between gap-3 sm:flex-row"
           style={{
