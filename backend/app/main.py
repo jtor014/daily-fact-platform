@@ -1,7 +1,10 @@
 import logging
 import sys
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+
+from app.core.database import connect_db, disconnect_db
 
 # Structured logging configuration
 logging.basicConfig(
@@ -12,7 +15,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Daily Fact Platform")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await connect_db()
+    logger.info("Application started")
+    yield
+    await disconnect_db()
+    logger.info("Application shut down")
+
+
+app = FastAPI(title="Daily Fact Platform", lifespan=lifespan)
 
 
 @app.get("/api/health")
