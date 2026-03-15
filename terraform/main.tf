@@ -100,14 +100,24 @@ resource "aws_instance" "dailyfact" {
   }
 }
 
+# --- Elastic IP ---
+
+resource "aws_eip" "dailyfact" {
+  instance = aws_instance.dailyfact.id
+
+  tags = {
+    Name = "dailyfact-eip"
+  }
+}
+
 # --- Outputs ---
 
 output "public_ip" {
-  description = "Public IP of the EC2 instance"
-  value       = aws_instance.dailyfact.public_ip
+  description = "Public IP of the EC2 instance (Elastic IP)"
+  value       = aws_eip.dailyfact.public_ip
 }
 
 output "ssh_command" {
   description = "SSH command to connect to the instance"
-  value       = "ssh -i ~/.ssh/dailyfact-key ec2-user@${aws_instance.dailyfact.public_ip}"
+  value       = "ssh -i ~/.ssh/dailyfact-key ec2-user@${aws_eip.dailyfact.public_ip}"
 }
