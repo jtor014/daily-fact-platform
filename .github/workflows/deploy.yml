@@ -17,6 +17,7 @@ jobs:
           script: |
             cd ~/daily-fact-platform
             git pull origin main
+            export FRONTEND_PORT=80
             docker compose up --build -d
 
       - name: Health check
