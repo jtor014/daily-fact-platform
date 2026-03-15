@@ -1,0 +1,70 @@
+name: Gemini Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  gemini-review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get PR diff
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} > /tmp/pr_diff.txt
+          head -c 50000 /tmp/pr_diff.txt > /tmp/pr_diff_trimmed.txt
+
+          if [ ! -s /tmp/pr_diff_trimmed.txt ]; then
+            echo "Error: Failed to retrieve PR diff or the diff was empty." > /tmp/review.txt
+            exit 0
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Gemini request
+        run: |
+          jq -n --rawfile diff /tmp/pr_diff_trimmed.txt '{
+            "contents": [{
+              "parts": [{
+                "text": ("You are a senior code reviewer. Review this PR diff and check for:\n1. Hardcoded secrets, API keys, or credentials\n2. Security vulnerabilities (injection, XSS, etc.)\n3. Best practices violations\n4. Error handling issues\n5. Performance concerns\n\nBe concise. If everything looks good, say: \"Looks good to merge.\"\nIf there are issues, list each as an \"Action Required:\" item with a clear fix.\n\nDiff:\n" + $diff)
+              }]
+            }]
+          }' > /tmp/gemini_request.json
+
+      - name: Review with Gemini
+        run: |
+          curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/gemini_request.json > /tmp/gemini_response.json
+
+          jq -r '.candidates[0].content.parts[0].text // empty' /tmp/gemini_response.json > /tmp/review.txt
+
+          if [ ! -s /tmp/review.txt ]; then
+            echo "Error: Gemini API returned an empty or unparsable review. Full response:" > /tmp/review.txt
+            jq '.' /tmp/gemini_response.json >> /tmp/review.txt
+          fi
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Post review comment
+        run: |
+          BODY=$(cat <<COMMENT_EOF
+          ## 🤖 Gemini Code Review
+
+          $(cat /tmp/review.txt)
+          COMMENT_EOF
+          )
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --body "$BODY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
