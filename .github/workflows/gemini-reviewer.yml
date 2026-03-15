@@ -18,43 +18,48 @@ jobs:
           fetch-depth: 0
 
       - name: Get PR diff
-        id: diff
         run: |
-          DIFF=$(gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }})
-          echo "diff<<DIFF_EOF" >> "$GITHUB_OUTPUT"
-          echo "$DIFF" | head -c 50000 >> "$GITHUB_OUTPUT"
-          echo "DIFF_EOF" >> "$GITHUB_OUTPUT"
+          gh pr diff ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} > /tmp/pr_diff.txt || true
+          head -c 50000 /tmp/pr_diff.txt > /tmp/pr_diff_trimmed.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Review with Gemini
-        id: review
+      - name: Build Gemini request
         run: |
-          REVIEW=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n --arg diff "$DIFF" '{
-              "contents": [{
-                "parts": [{
-                  "text": ("You are a senior code reviewer. Review this PR diff and check for:\n1. Hardcoded secrets, API keys, or credentials\n2. Security vulnerabilities (injection, XSS, etc.)\n3. Best practices violations\n4. Error handling issues\n5. Performance concerns\n\nBe concise. If everything looks good, say: \"Looks good to merge.\"\nIf there are issues, list each as an \"Action Required:\" item with a clear fix.\n\nDiff:\n" + $diff)
-                }]
+          jq -n --rawfile diff /tmp/pr_diff_trimmed.txt '{
+            "contents": [{
+              "parts": [{
+                "text": ("You are a senior code reviewer. Review this PR diff and check for:\n1. Hardcoded secrets, API keys, or credentials\n2. Security vulnerabilities (injection, XSS, etc.)\n3. Best practices violations\n4. Error handling issues\n5. Performance concerns\n\nBe concise. If everything looks good, say: \"Looks good to merge.\"\nIf there are issues, list each as an \"Action Required:\" item with a clear fix.\n\nDiff:\n" + $diff)
               }]
-            }')")
+            }]
+          }' > /tmp/gemini_request.json
 
-          REVIEW_TEXT=$(echo "$REVIEW" | jq -r '.candidates[0].content.parts[0].text // "Error: Could not get review from Gemini."')
+      - name: Review with Gemini
+        run: |
+          curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d @/tmp/gemini_request.json > /tmp/gemini_response.json
 
-          echo "review<<REVIEW_EOF" >> "$GITHUB_OUTPUT"
-          echo "$REVIEW_TEXT" >> "$GITHUB_OUTPUT"
-          echo "REVIEW_EOF" >> "$GITHUB_OUTPUT"
+          jq -r '.candidates[0].content.parts[0].text // empty' /tmp/gemini_response.json > /tmp/review.txt
+
+          if [ ! -s /tmp/review.txt ]; then
+            echo "Error: Gemini API returned no review. Response:" > /tmp/review.txt
+            jq '.' /tmp/gemini_response.json >> /tmp/review.txt
+          fi
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          DIFF: ${{ steps.diff.outputs.diff }}
 
       - name: Post review comment
         run: |
+          BODY=$(cat <<COMMENT_EOF
+          ## 🤖 Gemini Code Review
+
+          $(cat /tmp/review.txt)
+          COMMENT_EOF
+          )
           gh pr comment ${{ github.event.pull_request.number }} \
             --repo ${{ github.repository }} \
-            --body "## 🤖 Gemini Code Review
-
-          ${{ steps.review.outputs.review }}"
+            --body "$BODY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
