@@ -20,8 +20,13 @@ jobs:
       - name: Get PR diff
         run: |
           gh pr diff ${{ github.event.pull_request.number }} \
-            --repo ${{ github.repository }} > /tmp/pr_diff.txt || true
+            --repo ${{ github.repository }} > /tmp/pr_diff.txt
           head -c 50000 /tmp/pr_diff.txt > /tmp/pr_diff_trimmed.txt
+
+          if [ ! -s /tmp/pr_diff_trimmed.txt ]; then
+            echo "Error: Failed to retrieve PR diff or the diff was empty." > /tmp/review.txt
+            exit 0
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -44,7 +49,7 @@ jobs:
           jq -r '.candidates[0].content.parts[0].text // empty' /tmp/gemini_response.json > /tmp/review.txt
 
           if [ ! -s /tmp/review.txt ]; then
-            echo "Error: Gemini API returned no review. Response:" > /tmp/review.txt
+            echo "Error: Gemini API returned an empty or unparsable review. Full response:" > /tmp/review.txt
             jq '.' /tmp/gemini_response.json >> /tmp/review.txt
           fi
         env:
