@@ -192,7 +192,11 @@ The deploy-on-merge action will automatically deploy the reverted state.
 
 
 ## Lessons Learned
-(Updated during sprint retros — Claude adds findings here)
+
+### Retro 1 (after Ticket 4)
+- Verify third-party GitHub Actions exist before referencing them. google-github-actions/gemini-code-review@v1 doesn't exist — built a custom workflow calling Gemini API directly (better: full control over prompt).
+- Free-tier API limits can bite you in CI. Gemini 2.0 Flash had zero free-tier quota. Switched to gemini-2.5-flash.
+- Avoid exposing container ports to the host when only inter-container communication is needed. Removed postgres host port (5432 conflict with local postgres). Backend connects via Docker internal network.
 
 
 ## Working with Claude Code (Strengths & Limitations)
