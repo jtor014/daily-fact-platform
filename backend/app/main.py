@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import sys
 from contextlib import asynccontextmanager
@@ -5,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.database import connect_db, disconnect_db
+from app.worker.scheduler import run_worker
 
 # Structured logging configuration
 logging.basicConfig(
@@ -19,8 +21,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
+    worker_task = asyncio.create_task(run_worker())
     logger.info("Application started")
     yield
+    worker_task.cancel()
     await disconnect_db()
     logger.info("Application shut down")
 
