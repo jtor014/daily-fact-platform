@@ -203,6 +203,11 @@ The deploy-on-merge action will automatically deploy the reverted state.
 - Free-tier API limits can bite you in CI. Gemini 2.0 Flash had zero free-tier quota. Switched to gemini-2.5-flash.
 - Avoid exposing container ports to the host when only inter-container communication is needed. Removed postgres host port (5432 conflict with local postgres). Backend connects via Docker internal network.
 
+### Retro 2 (after Ticket 7)
+- Map DB column names to API field names explicitly in the route handler, not the model. Keeps Pydantic models clean and the mapping visible.
+- Mock at the right boundary: get_pool() in endpoint tests, fetch_random_fact() in worker tests. Keeps tests focused and fast without a real database.
+- Always run make lint alongside make test before committing. Catches line-length and unused-import issues early.
+
 
 ## Working with Claude Code (Strengths & Limitations)
 GOOD AT: File creation, boilerplate, repetitive patterns, CLI commands,
