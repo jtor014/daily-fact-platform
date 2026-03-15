@@ -208,6 +208,12 @@ The deploy-on-merge action will automatically deploy the reverted state.
 - Mock at the right boundary: get_pool() in endpoint tests, fetch_random_fact() in worker tests. Keeps tests focused and fast without a real database.
 - Always run make lint alongside make test before committing. Catches line-length and unused-import issues early.
 
+### Retro 3 (after Ticket 11)
+- GitHub Actions runners need network access. If SSH is IP-restricted, CI deploy will fail. Open SSH to 0.0.0.0/0 when using key-authenticated CI deploys.
+- Terraform user_data changes can cause IP changes. Use an Elastic IP if you need a stable address, or accept that secrets need updating.
+- Docker Compose v5 requires buildx >= 0.17. Amazon Linux ships older buildx — must install manually in user_data.
+- Use env vars for environment-specific config (like FRONTEND_PORT) rather than editing files on the server. Keeps git pull deploys clean.
+
 
 ## Working with Claude Code (Strengths & Limitations)
 GOOD AT: File creation, boilerplate, repetitive patterns, CLI commands,
