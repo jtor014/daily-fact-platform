@@ -170,8 +170,13 @@ This is more important with AI-generated code because Claude pattern-matches, no
 Tests are the PROOF that the pattern-matching produced correct behaviour.
 
 
-## Sprint Retro (after Tickets 4, 7, 11)
-Lead a retro covering five areas:
+## Sprint Retro (MANDATORY after Tickets 4, 7, 11)
+IMPORTANT: After completing and merging Ticket 4, 7, or 11, you MUST
+immediately run a sprint retro BEFORE the Director asks for the next ticket.
+Do not wait to be told. Do not skip this. Proactively say:
+"Ticket N is merged. This is a retro checkpoint. Here's the sprint retro:"
+
+Cover five areas:
 1. WORKFLOW: What's working? What's slow? What did I miss?
 2. ARCHITECTURAL REVIEW (targeted checklist):
    - Same error handling pattern across all routes?
@@ -212,6 +217,9 @@ RULES:
 - If making a design decision that affects multiple files, flag it in the Director's Briefing
 - Never silently change a pattern established in earlier tickets
 - When something fails and you don't know why, say so — don't guess
+- Never assume a third-party action, package, or API endpoint exists. Verify before writing code that depends on it.
+- Don't expose container ports to the host unless the Director needs direct access. Use Docker's internal network for service-to-service communication.
+- After a retro checkpoint ticket (4, 7, 11), STOP and run the sprint retro proactively. Don't wait to be asked.
 
 
 ## PR Size Limit
