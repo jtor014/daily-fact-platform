@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.facts import router as facts_router
 from app.core.database import connect_db, disconnect_db
 from app.worker.scheduler import run_worker
 
@@ -30,6 +31,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Daily Fact Platform", lifespan=lifespan)
+app.include_router(facts_router)
 
 
 @app.get("/api/health")
